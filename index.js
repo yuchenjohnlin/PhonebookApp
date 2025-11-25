@@ -12,6 +12,10 @@ app.use(express.json())
 morgan.token('body', (req) => JSON.stringify(req.body))
 app.use(morgan('tiny'))
 
+// don't need to add input for the password because we put it in the .env file
+
+// --------- routes --------- 
+
 app.get('/api/persons', (request, response, next) => {
   Person.find({})
     .then(persons => response.json(persons))
@@ -44,6 +48,26 @@ app.get('/api/persons/:id', (request, response, next) => {
     .catch(error => next(error))
 })
 
+app.put('/api/persons/:id', (request, response, next) => {
+  const { name, number } = request.body
+  // console.log(request.body)
+
+  Person.findById(request.params.id)
+    .then(person => {
+      if (!person) {
+        return response.status(404).end()
+      }
+
+      person.name = name
+      person.number = number
+
+      return person.save().then((updatedPerson) => {
+        response.json(updatedPerson)
+      })
+    })
+    .catch(error => next(error))
+})
+
 app.post('/api/persons', (request, response, next) => {
   const { name, number } = request.body
 
@@ -54,7 +78,8 @@ app.post('/api/persons', (request, response, next) => {
   Person.findOne({ name })
     .then(existing => {
       if (existing) {
-        return response.status(400).json({ error: 'name must be unique' })
+        response.status(400).json({ error: 'name must be unique' })
+        return null // stop the promise chain
       }
 
       const person = new Person({ name, number })
@@ -84,6 +109,9 @@ const errorHandler = (error, request, response, next) => {
 
   if (error.name === 'CastError') {
     return response.status(400).send({ error: 'malformatted id' })
+  }
+  if (error.name === 'ValidationError') {
+    return response.status(400).json({ error: error.message })
   }
 
   next(error)
